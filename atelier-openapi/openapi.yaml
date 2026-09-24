@@ -83,27 +83,27 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: "#/components/schemas/RegisterRequest"
       responses:
-        '201':
+        "201":
           description: Dossier voyageur ouvert.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '409':
+                $ref: "#/components/schemas/User"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
           description: Un dossier existe déjà pour cette adresse.
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/Problem'
+                $ref: "#/components/schemas/Problem"
               example:
-                type: 'https://api.catapulte-connect.ontb.example/errors/email-taken'
+                type: "https://api.catapulte-connect.ontb.example/errors/email-taken"
                 title: Adresse déjà enregistrée
                 status: 409
                 detail: Un dossier voyageur existe déjà pour bob@example.com.
-        '422': { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /auth/login:
     post:
@@ -123,27 +123,27 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
       responses:
-        '200':
+        "200":
           description: Jetons délivrés.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenPair'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401':
+                $ref: "#/components/schemas/TokenPair"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401":
           description: Identifiants invalides.
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/Problem'
+                $ref: "#/components/schemas/Problem"
               example:
-                type: 'https://api.catapulte-connect.ontb.example/errors/invalid-credentials'
+                type: "https://api.catapulte-connect.ontb.example/errors/invalid-credentials"
                 title: Identifiants invalides
                 status: 401
                 detail: Adresse e-mail ou mot de passe incorrect.
-        '422': { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /auth/refresh:
     post:
@@ -162,9 +162,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RefreshRequest'
+              $ref: "#/components/schemas/RefreshRequest"
       responses:
-        '200':
+        "200":
           description: Nouveau jeton d'accès délivré.
           content:
             application/json:
@@ -175,14 +175,14 @@ paths:
                   accessToken:
                     type: string
                     description: Jeton d'accès, valable 1 heure.
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401':
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401":
           description: Jeton de renouvellement invalide ou expiré.
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/Problem'
-        '422': { $ref: '#/components/responses/ValidationError' }
+                $ref: "#/components/schemas/Problem"
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /users/me:
     get:
@@ -195,13 +195,13 @@ paths:
         Il n'existe pas d'opération pour consulter le dossier d'un autre voyageur : le
         jeton désigne le titulaire, aucun identifiant ne circule dans le chemin.
       responses:
-        '200':
+        "200":
           description: Dossier du voyageur connecté.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
-        '401': { $ref: '#/components/responses/Unauthorized' }
+                $ref: "#/components/schemas/User"
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ==========================================================================
   #  À VOUS — Le flux de réservation
@@ -225,16 +225,132 @@ paths:
   #   Chaque ville du réseau possède une catapulte unique en son centre.
   #   Opération PUBLIQUE : on cherche sans être connecté.
 
+  /cities:
+    get:
+      tags: [Découverte]
+      operationId: listCities
+      summary: Rechercher une ville desservie
+      description: |
+        Retourne les villes du réseau, filtrées par recherche textuelle. Chaque ville
+        possède une catapulte unique en son centre, qui sert à la fois de point de
+        lancement et de zone de réception.
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Filtre textuel sur le nom de la ville. Insensible à la casse et aux accents.
+          schema:
+            type: string
+          example: dij
+        - name: limit
+          in: query
+          required: false
+          description: Nombre maximum de villes retournées.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Villes correspondant au filtre. Tableau vide si aucune.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/City"
+              example:
+                - id: 3f2a1b8c-5d4e-4f6a-9b8c-1d2e3f4a5b6c
+                  name: Dijon
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   # POST /trips/search
   #   Rechercher les lancers reliant deux villes à une date donnée, pour un
   #   nombre de places. Tous les lancers sont directs : aucune correspondance,
   #   aucun itinéraire composé. Sans lancer direct ce jour-là, la liste est vide.
   #   Opération PUBLIQUE.
 
+  /trips/search:
+    post:
+      tags: [Découverte]
+      operationId: tripSummary
+      summary: Bandereau de voyage
+      description: |
+        Rechercher un lancer demande une ville de départ, une ville d'arrivée, une date et un nombre de personnes.
+        La réponse liste les lancers correspondants : de quoi choisir, pas de quoi préparer son voyage.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [departureCity, arrivalCity, date, passengers]
+              properties: 
+                departureCity:
+                  type: string
+                  format: uuid
+                  example: 3f2a1b8c-5d4e-4f6a-9b8c-1d2e3f4a5b6c
+                arrivalCity:
+                  type: string
+                  format: uuid
+                  example: 3f2a1b8c-5d4e-4f6a-9b8c-1d2e3f4a5b6c
+                date: 
+                  type: string
+                  format: date
+                  example: 2004-02-09
+                passengers: 
+                  type: integer
+                  minimum: 1
+                  example: 42
+      responses:
+        "200":
+          description: Villes correspondant au filtre. Tableau vide si aucune.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TripSummary"
+                
+
+        
+
   # GET /trips/{id}
   #   Consulter le détail d'un lancer. Le détail porte ce qu'une liste de
   #   résultats n'a aucune raison de transporter pour chacune de ses lignes.
   #   Opération PUBLIQUE.
+
+  /trips/{id}:
+    get:
+      tags: [Découverte]
+      operationId: tripDetail
+      summary: Afficher le détail d'un voyage
+      description: |
+        Consulter le détail d'un lancer ajoute ce dont on a besoin une fois qu'on l'a choisi.
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Id unique du lancer
+          schema: 
+            type: string
+            format: uuid
+      responses: 
+        "200":
+          description: Affiche le détail du voyage avec toutes les informations demandées
+          content: 
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+
 
   # ---- Panier (authentifié) ------------------------------------------------
 
@@ -242,19 +358,92 @@ paths:
   #   Ouvrir un panier vide. C'est ici que la connexion devient nécessaire :
   #   la découverte est libre, la réservation est nominative.
 
+  /carts:
+    post:
+      tags: [Panier]
+      operationId: cartCreation
+      summary: ouvre un panier vide pour un user
+      description: |
+        Ouvrir un panier crée un panier vide, au statut en attente. 
+        Un voyageur n'a qu'un seul panier actif à la fois.
+      responses:
+        "201": 
+          description: Ouvre le panier pour le user 
+          content: 
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   # GET /carts
   #   Récupérer le panier actif du voyageur connecté. Un voyageur n'a qu'un
   #   panier actif à la fois — et parfois aucun, ce qui est un état normal
   #   et non une erreur. Réfléchissez à ce que ça implique pour la réponse.
+
+  /carts:
+    get:
+      tags: [Panier]
+      operationId: activeCart
+      summary: recupere le panier actif du user
+      description: |
+        Récupérer son panier actif rend le panier en attente du voyageur connecté, s'il en a un. 
+        Ne pas avoir de panier est un état normal, pas une erreur.
+      responses: 
+        "200":
+          description: panier du user ou tableau vide 
+          content:
+            application/json:
+              schema:
+                type: array
+                items: 
+                  $ref: "#/components/schemas/Cart"
+
 
   # POST /carts/{id}/items
   #   Ajouter un lancer au panier, avec un nombre de places.
   #   L'écran de panier doit pouvoir se peindre à partir de cette seule
   #   réponse, sans second appel. Le total est calculé par le serveur.
 
+    /carts/{id}/items:
+      post:
+        tags: [Panier]
+        operationId: addCartItem
+        summary: ajouter un item dans le panier du user
+        description: |
+          Ajouter un lancer demande le lancer visé et un nombre de places. 
+          L'écran de panier doit pouvoir se peindre à partir de cette seule réponse : le total, recalculé par l'Office, en fait donc partie.
+        responses:
+          "201":
+            description: L'ajout au panier est couronné de succès
+            content: 
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/CartItem"
+          "401":
+            $ref: "#/components/responses/Unauthorized"
+          
+
   # DELETE /carts/{id}/items/{itemId}
   #   Retirer une ligne du panier. Si c'était la dernière, le panier disparaît
-  #   côté serveur — le voyageur n'a rien à faire de plus.
+  #   côté serveur — le voyageur n'a rien à faire de plus.``
+
+    /carts/{id}/items/{itemId}:
+      delete:
+        tags: [Panier]
+        operationid: deleteitem
+        description: retirer un item du panier
+        responses:
+          "201":
+            description: |
+              Retirer un lancer retire une ligne. 
+              Si c'était la dernière, le panier disparaît, et le voyageur n'a rien à faire de plus.
+            content: 
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/CartItem"
+          "401":
+            $ref: "#/components/responses/Unauthorized"
 
   # POST /carts/{id}/pay
   #   Payer le panier : il passe de `pending` à `paid` et les billets sont
@@ -262,6 +451,14 @@ paths:
   #   déclare un moyen de paiement, rien de plus.
   #   L'écran de confirmation doit pouvoir se peindre à partir de cette seule
   #   réponse. Que se passe-t-il si le panier est déjà payé ?
+
+    /carts/{id}/pay:
+      post:
+        tags: [Panier]
+        operationId: payCart
+        description: payer le panier actif du user
+        responses:
+          ""
 
   # ---- Billets (authentifié) -----------------------------------------------
 
@@ -295,9 +492,9 @@ components:
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/Problem'
+            $ref: "#/components/schemas/Problem"
           example:
-            type: 'about:blank'
+            type: "about:blank"
             title: Bad Request
             status: 400
             detail: Syntax error in JSON body.
@@ -307,9 +504,9 @@ components:
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/Problem'
+            $ref: "#/components/schemas/Problem"
           example:
-            type: 'about:blank'
+            type: "about:blank"
             title: Unauthorized
             status: 401
             detail: Jeton d'accès absent, invalide ou expiré.
@@ -319,9 +516,9 @@ components:
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/Problem'
+            $ref: "#/components/schemas/Problem"
           example:
-            type: 'https://api.catapulte-connect.ontb.example/errors/not-owner'
+            type: "https://api.catapulte-connect.ontb.example/errors/not-owner"
             title: Accès refusé
             status: 403
             detail: Ce panier appartient à un autre dossier voyageur.
@@ -331,9 +528,9 @@ components:
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/Problem'
+            $ref: "#/components/schemas/Problem"
           example:
-            type: 'about:blank'
+            type: "about:blank"
             title: Not Found
             status: 404
             detail: Aucune ressource ne correspond à cet identifiant.
@@ -345,9 +542,9 @@ components:
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ValidationProblem'
+            $ref: "#/components/schemas/ValidationProblem"
           example:
-            type: 'https://api.catapulte-connect.ontb.example/errors/validation'
+            type: "https://api.catapulte-connect.ontb.example/errors/validation"
             title: Données invalides
             status: 422
             detail: 1 champ est en erreur.
@@ -367,7 +564,7 @@ components:
         type:
           type: string
           format: uri
-          default: 'about:blank'
+          default: "about:blank"
           description: URI identifiant le type d'erreur. `about:blank` quand le statut HTTP suffit à la décrire.
         title:
           type: string
@@ -386,7 +583,7 @@ components:
     ValidationProblem:
       description: Erreur de validation — un `Problem` enrichi du détail des champs fautifs.
       allOf:
-        - $ref: '#/components/schemas/Problem'
+        - $ref: "#/components/schemas/Problem"
         - type: object
           properties:
             violations:
@@ -477,7 +674,8 @@ components:
         createdAt:
           type: string
           format: date-time
-          example: '2027-02-14T10:03:00Z'
+          example: "2027-02-14T10:03:00Z"
+
 
     # ==========================================================================
     #  À VOUS — Les schémas du flux de réservation
@@ -496,20 +694,139 @@ components:
     #   Une ville desservie. Chaque ville possède une catapulte unique en son
     #   centre, qui sert à la fois de point de lancement et de réception.
 
+    City:
+      type: object
+      description: Ville desservie.
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+        name:
+          type: string
+          example: Montreuil
+
     # TripSummary
     #   Un lancer tel qu'il apparaît dans une liste de résultats : de quoi
     #   choisir, pas de quoi préparer son voyage.
+
+    TripSummary:
+      type: object
+      description: Bandereau de voyage.
+      required: [id, hour, departureCity, arrivalCity, price, duration]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+        hour:
+          type: string
+          example: 07:10
+        departureCity:
+          $ref: '#/components/schemas/City'
+          example: { id: "123...", name: "Dijon" }
+        arrivalCity:
+          $ref: '#/components/schemas/City'
+          example: { id: "123...", name: "Dijon" }
+        price:
+          type: integer
+          example: 67
+        duration:
+          type: integer
+          example: 45
+
 
     # TripDetail
     #   Le même lancer, consulté seul. Il ajoute ce dont on a besoin une fois
     #   qu'on l'a choisi — notamment la franchise de masse, qui n'est pas ici
     #   une limite commerciale mais balistique.
 
+    TripDetail:
+      type: object
+      description: Detail du voyage.
+      all of:
+        - $ref: "#/components/schemas/TripSummary"
+        - required: [mass,  catapultType, boardingInstruction]
+            properties: 
+              mass: 
+                type: integer
+                example: 23
+              catapultType:
+                type: string
+                example: Onagre M3
+              boardingInstruction:
+                type: string
+                example: Se présenter à {heure} à {endroit} avec {mass} de bagages
+        
+
     # Cart
     #   Un panier de réservation. Il connaît son état, ses lignes, et son total.
+
+    Cart:
+      type: object
+      description: Panier du user
+      required: [id, totalPrice, items, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+        totalPrice:
+          type: integer
+          example: 135
+        items:
+          type: array
+          description: Tableau contenant les items placés dans le panier par le User
+          items:
+            $ref: "#/components/schemas/CartItem"
+        status:
+          type: string
+          enum: [pending, paid]
+        createdAt:
+          type: string
+          format: date-time
+
 
     # CartItem
     #   Une ligne de panier : un lancer et un nombre de places.
 
+    CartItem: 
+      type: object
+      description: Item à l'interieur du panier du user
+      required: [id, nbTicket, trip, totalPrice]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+        nbTicket:
+          type: integer
+          example: 2
+        trip:
+          $ref: "#/components/schemas/TripSummary"
+        totalPrice:
+          type: integer
+          example: 188
+
     # Ticket
     #   Un droit à embarquer sur un lancer, émis au paiement. Un par place.
+
+    Ticket:
+      type: object
+      description: Billet du user
+      required: [id, price, createdAt, trip]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+        price: 
+          type: integer
+          example: 54
+        createdAt:
+          type: string
+          format: date-time
+        trip: 
+          $ref: "#/components/schemas/TripSummary"
+
