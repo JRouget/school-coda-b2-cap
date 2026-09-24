@@ -6,6 +6,10 @@ L'Office National des Trajectoires Balistiques vous confie la conception du cont
 d'API de **CATAPULTE Connect**, sa billetterie grand public. Vous n'écrirez pas de
 code : vous écrivez le **contrat**, et le contrat fait foi.
 
+## IA
+
+L'ia à été utilisé pour m'aider sur les premieres requetes et schemas, le reste je l'ai fait moi même
+
 ## Démarrer
 
 Placez-vous dans ce dossier, puis lancez le mock :
